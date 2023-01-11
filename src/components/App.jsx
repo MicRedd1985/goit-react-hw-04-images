@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import { useState, useEffect } from 'react';
 import * as API from '../API/API';
 import Searchbar from './Searchbar/Searchbar';
 import { ToastContainer } from 'react-toastify';
@@ -7,101 +7,77 @@ import LoadMoreBtn from './Button/LoadMoreBtn';
 import LoaderImg from './Loader/Loader';
 import Modal from './Modal/Modal';
 
-export class App extends Component {
-  state = {
-    page: 1,
-    query: '',
-    images: [],
-    error: '',
-    isLoading: false,
-    isShowModal: false,
-    largeImageURL: '',
-    tags: '',
-    totalImages: 0,
-  };
+export function App() {
+  const [page, setPage] = useState(1);
+  const [query, setQuery] = useState('');
+  const [images, setImages] = useState([]);
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isShowModal, setIsShowModal] = useState(false);
+  const [largeImageURL, setLargeImageURL] = useState('');
+  const [tags, setTags] = useState('');
+  const [totalImages, setTotalImages] = useState(0);
 
-  async componentDidUpdate(_, prevState) {
-    const { query, page } = this.state;
-
-    if (
-      prevState.page !== this.state.page ||
-      prevState.query !== this.state.query
-    ) {
-      this.setState({ isLoading: true });
-      API.fetchImages(query, page)
-        .then(({ hits, totalHits }) => {
-          if (hits.length) {
-            return this.setState(prev => ({
-              images: [...prev.images, ...hits],
-              totalImages: totalHits,
-            }));
-          }
-          this.setState(prevState => ({
-            page: prevState.page + 1,
-          }));
-        })
-        .catch(error => this.setState({ error }))
-        .finally(() => {
-          this.setState({ isLoading: false });
-        });
+  useEffect(() => {
+    if (query === '') {
+      return;
     }
-  }
+    setIsLoading(true);
+    API.fetchImages(query, page)
+      .then(({ hits, totalHits }) => {
+        if (hits.length) {
+          setImages(images => [...images, ...hits]);
+          setTotalImages(totalHits);
+        }
+      })
+      .catch(error => setError({ error }))
+      .finally(() => {
+        setIsLoading(false);
+      });
+  }, [query, page]);
 
-  loadMore = e => {
-    e.preventDefault();
-    this.setState(prevState => ({
-      page: prevState.page + 1,
-    }));
+  const onSearch = query => {
+    setQuery(query);
+    setImages([]);
+    setPage(1);
   };
 
-  onSearch = query => {
-    this.setState({
-      query,
-      images: [],
-      page: 1,
-    });
+  const onClick = largeImageURL => {
+    setLargeImageURL(largeImageURL);
+    setTags(tags);
+    toggleModal();
   };
 
-  onClick = largeImageURL => {
-    this.setState({ largeImageURL });
-    this.toggleModal();
+  const toggleModal = () => {
+    setIsShowModal(isShowModal => !isShowModal);
   };
 
-  toggleModal = () => {
-    this.setState(({ isShowModal }) => ({
-      isShowModal: !isShowModal,
-    }));
+  const ifLoadMore = () => {
+    return totalImages - images.length > 12;
   };
 
-  ifLoadMore = () => {
-    return this.state.totalImages - this.state.images.length > 12;
-  };
+  return (
+    <>
+      <Searchbar onSubmit={onSearch} />
+      {images.length !== 0 && (
+        <>
+          <ImageGallery onClick={onClick} images={images} />
+          {ifLoadMore() && !isLoading && (
+            <LoadMoreBtn onClick={() => setPage(page => page + 1)} />
+          )}
+        </>
+      )}
+      {isLoading && <LoaderImg />}
 
-  render() {
-    const { isLoading, images, isShowModal, largeImageURL, tags, error } =
-      this.state;
-    return (
-      <>
-        <Searchbar onSubmit={this.onSearch} />
-        {images.length !== 0 && (
-          <>
-            <ImageGallery onClick={this.onClick} images={images} />
-            {this.ifLoadMore() && !isLoading && (
-              <LoadMoreBtn onClick={this.loadMore} />
-            )}
-          </>
-        )}
-        {isLoading && <LoaderImg />}
-
-        {error && <h1>Sorry, so sorry! {tags}.</h1>}
-        {isShowModal && (
-          <Modal onClose={this.toggleModal}>
-            <img src={largeImageURL} alt={tags} />
-          </Modal>
-        )}
-        <ToastContainer autoClose={2000} />
-      </>
-    );
-  }
+      {error && <h1>Sorry, so sorry! {tags}.</h1>}
+      {isShowModal && (
+        <Modal onClose={toggleModal}>
+          <img src={largeImageURL} alt={tags} />
+        </Modal>
+      )}
+      <ToastContainer autoClose={2000} />
+    </>
+  );
 }
+
 export default App;
